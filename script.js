@@ -813,9 +813,20 @@ function renderItemList(keys) {
 // ========================================================
 // NAVIGATION
 // ========================================================
-previousButton.onclick = () => showItem(currentIndex - 1);
-nextButton.onclick = () => showItem(currentIndex + 1);
+previousButton.onclick =
+    () => {
 
+        showItem(
+            currentIndex - 1
+        );
+    };
+
+nextButton.onclick =
+    () => {
+
+        showItem(
+            currentIndex + 1
+        );
     };
 
 // ========================================================
