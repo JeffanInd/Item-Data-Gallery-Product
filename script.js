@@ -810,54 +810,36 @@ function renderItemList(keys) {
     }
 }
 
-
 // ========================================================
 // NAVIGATION
 // ========================================================
-previousButton.onclick =
-    () => {
-
-        showItem(
-            currentIndex - 1
-        );
-    };
-
-nextButton.onclick =
-    () => {
-
-        showItem(
-            currentIndex + 1
-        );
+previousButton.onclick = () => showItem(currentIndex - 1);
+nextButton.onclick = () => showItem(currentIndex + 1);
 
     };
-
 
 // ========================================================
 // SELECT ITEM CODE
 // ========================================================
-kodeSelector.onchange =
-    function () {
-        if (!this.value) {
-            resetGallery();
-            return;
-        }
+kodeSelector.onchange = function () {
 
-        currentMode =
-            "single";
-        filteredItems =
-            [this.value];
-        currentIndex =
-            0;
-        kategoriSelector.value =
-            "";
-        vendorSelector.value =
-            "";
-        KodeSearch.value =
-            "";
-        showItem(0);
+    if (!this.value) {
+        resetGallery();
+        return;
+    }
 
-    };
+    currentMode = "single";
 
+    filteredItems = Object.keys(data);
+
+    currentIndex = filteredItems.indexOf(this.value);
+
+    kategoriSelector.value = "";
+    vendorSelector.value = "";
+    KodeSearch.value = "";
+
+    showItem(currentIndex);
+};
 
 // ========================================================
 // SEARCH
