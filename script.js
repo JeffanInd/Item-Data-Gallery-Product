@@ -11,7 +11,6 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const auth = firebase.auth();
 const ITEMS_COLLECTION = "items";
 
 // ================= ELEMENTS =================
@@ -1451,8 +1450,6 @@ document.addEventListener(
             "Connecting to Firebase...",
             "info"
         );
-
-        await auth.signInAnonymously();
         await loadItemsFromFirestore();
 
     }
