@@ -1072,11 +1072,12 @@ window.deleteSelectedItem =
     deleteSelectedItem;
 
 // ========================================================
-// EXCEL IMPORT
+// EXCEL IMPORT - LARGE DATA / UNLIMITED BATCH
 // ========================================================
+
 async function uploadExcelToFirestore() {
-    const file =
-        excelFile?.files?.[0];
+
+    const file = excelFile?.files?.[0];
 
     if (!file) {
 
@@ -1088,15 +1089,20 @@ async function uploadExcelToFirestore() {
 
     }
 
+
     try {
 
-        uploadExcelButton.disabled =
-            true;
+        uploadExcelButton.disabled = true;
 
         setStatus(
-            "Reading Excel file...",
+            "Membaca file Excel...",
             "info"
         );
+
+
+        // ================================================
+        // READ EXCEL
+        // ================================================
 
         const buffer =
             await file.arrayBuffer();
@@ -1109,18 +1115,35 @@ async function uploadExcelToFirestore() {
                 }
             );
 
-        const firstSheet =
-            workbook.Sheets[
-                workbook.SheetNames[0]
-            ];
+
+        if (
+            !workbook.SheetNames ||
+            workbook.SheetNames.length === 0
+        ) {
+
+            throw new Error(
+                "Sheet Excel tidak ditemukan."
+            );
+
+        }
+
+
+        const sheetName =
+            workbook.SheetNames[0];
+
+        const worksheet =
+            workbook.Sheets[sheetName];
+
 
         const rows =
             XLSX.utils.sheet_to_json(
-                firstSheet,
+                worksheet,
                 {
-                    defval: ""
+                    defval: "",
+                    raw: false
                 }
             );
+
 
         if (!rows.length) {
 
@@ -1130,77 +1153,215 @@ async function uploadExcelToFirestore() {
 
         }
 
+
+        console.log(
+            "Total Excel rows:",
+            rows.length
+        );
+
+
+        // ================================================
+        // CONVERT EXCEL DATA
+        // ================================================
+
         const items = [];
+
         const invalidRows = [];
-        const seen =
+
+        const duplicateRows = [];
+
+        const seenCodes =
             new Set();
+
 
         rows.forEach(
             (row, index) => {
+
+                const excelRowNumber =
+                    index + 2;
+
 
                 const code =
                     getExcelCode(row);
 
 
+                // ----------------------------------------
+                // NO CODE
+                // ----------------------------------------
+
                 if (!code) {
 
                     invalidRows.push(
-                        index + 2
+                        excelRowNumber
                     );
 
                     return;
 
                 }
 
-                if (seen.has(code)) {
+
+                // ----------------------------------------
+                // DUPLICATE CODE
+                // ----------------------------------------
+
+                if (
+                    seenCodes.has(code)
+                ) {
+
+                    duplicateRows.push({
+                        row:
+                            excelRowNumber,
+                        code:
+                            code
+                    });
 
                     return;
 
                 }
-                seen.add(code);
+
+
+                seenCodes.add(code);
+
+
+                // ----------------------------------------
+                // ITEM
+                // ----------------------------------------
+
+                const item =
+                    excelRowToItem(row);
+
+
+                item.kode =
+                    code;
+
+
                 items.push({
-                    code,
-                    item: {
-                        ...excelRowToItem(row),
-                        kode: code
-                    }
+
+                    code:
+                        code,
+
+                    item:
+                        item
+
                 });
+
             }
         );
+
+
+        console.log(
+            "Valid items:",
+            items.length
+        );
+
+        console.log(
+            "Invalid rows:",
+            invalidRows.length
+        );
+
+        console.log(
+            "Duplicate rows:",
+            duplicateRows.length
+        );
+
 
         if (!items.length) {
 
             throw new Error(
-                "Tidak ada item valid. Pastikan kolom kode / Item Code tersedia."
+                "Tidak ada item valid. Pastikan kolom 'kode' tersedia di Excel."
             );
+
         }
 
+
+        // ================================================
+        // FIRESTORE BATCH
+        // ================================================
+
+        /*
+            Firestore maximum:
+            500 writes / batch.
+
+            Kita menggunakan 450 agar lebih aman.
+        */
+
+        const BATCH_SIZE = 450;
+
+
+        const totalItems =
+            items.length;
+
+
+        const totalBatches =
+            Math.ceil(
+                totalItems / BATCH_SIZE
+            );
+
+
+        let uploadedCount = 0;
+
+
         setStatus(
-            `Uploading ${items.length.toLocaleString()} items...`,
+            `Memulai upload ${totalItems.toLocaleString()} item...`,
             "info"
         );
 
+
+        // ================================================
+        // UPLOAD EVERY BATCH
+        // ================================================
+
         for (
-            let i = 0;
-            i < items.length;
-            i += 450
+            let batchNumber = 1;
+            batchNumber <= totalBatches;
+            batchNumber++
         ) {
 
-            const chunk =
-                items.slice(
-                    i,
-                    i + 450
+            const startIndex =
+                (
+                    batchNumber - 1
+                ) * BATCH_SIZE;
+
+
+            const endIndex =
+                Math.min(
+                    startIndex + BATCH_SIZE,
+                    totalItems
                 );
 
+
+            const batchItems =
+                items.slice(
+                    startIndex,
+                    endIndex
+                );
+
+
+            console.log(
+                `Uploading batch ${batchNumber}/${totalBatches}`,
+                batchItems.length,
+                "items"
+            );
+
+
+            setStatus(
+                `Uploading batch ${batchNumber}/${totalBatches} — ${uploadedCount.toLocaleString()} / ${totalItems.toLocaleString()} item...`,
+                "info"
+            );
+
+
+            // ============================================
+            // CREATE BATCH
+            // ============================================
 
             const batch =
                 db.batch();
 
 
-            chunk.forEach(
+            batchItems.forEach(
                 ({ code, item }) => {
 
-                    const ref =
+                    const docRef =
                         db
                             .collection(
                                 ITEMS_COLLECTION
@@ -1209,7 +1370,7 @@ async function uploadExcelToFirestore() {
 
 
                     batch.set(
-                        ref,
+                        docRef,
                         item,
                         {
                             merge: true
@@ -1219,65 +1380,186 @@ async function uploadExcelToFirestore() {
                 }
             );
 
-            await batch.commit();
-            setStatus(
-                `Uploaded ${Math.min(
-                    i + chunk.length,
-                    items.length
-                ).toLocaleString()} / ${items.length.toLocaleString()} items...`,
-                "info"
-            );
+
+            // ============================================
+            // COMMIT
+            // ============================================
+
+            try {
+
+                await batch.commit();
+
+
+                uploadedCount +=
+                    batchItems.length;
+
+
+                console.log(
+                    `Batch ${batchNumber} completed.`,
+                    `${uploadedCount}/${totalItems}`
+                );
+
+
+                setStatus(
+                    `Upload berjalan: ${uploadedCount.toLocaleString()} / ${totalItems.toLocaleString()} item`,
+                    "info"
+                );
+
+
+            }
+
+            catch (batchError) {
+
+                console.error(
+                    `Batch ${batchNumber} ERROR:`,
+                    batchError
+                );
+
+
+                throw new Error(
+                    `Upload berhenti pada batch ${batchNumber}/${totalBatches} ` +
+                    `(${startIndex + 1}-${endIndex}).
+
+` +
+                    `Item berhasil sebelumnya: ${uploadedCount}
+
+` +
+                    `Firebase Code: ${
+                        batchError.code || "-"
+                    }
+
+` +
+                    `Firebase Message: ${
+                        batchError.message || "-"
+                    }`
+                );
+
+            }
 
         }
 
-        await loadItemsFromFirestore();
-        const invalidMessage =
-            invalidRows.length
 
-                ?
-
-                ` Baris tanpa kode dilewati: ${
-                    invalidRows
-                        .slice(0, 20)
-                        .join(", ")
-                }${
-                    invalidRows.length > 20
-                        ? "..."
-                        : ""
-                }.`
-
-                :
-
-                "";
+        // ================================================
+        // RELOAD FIRESTORE DATA
+        // ================================================
 
         setStatus(
-            `${items.length.toLocaleString()} item berhasil di-upload ke Firestore.${invalidMessage}`,
+            "Upload selesai. Memuat ulang data...",
+            "info"
+        );
+
+
+        await loadItemsFromFirestore();
+
+
+        // ================================================
+        // RESULT
+        // ================================================
+
+        let resultMessage =
+            `${uploadedCount.toLocaleString()} item berhasil di-upload.`;
+
+
+        if (
+            invalidRows.length > 0
+        ) {
+
+            resultMessage +=
+                `\n\n${
+                    invalidRows.length
+                } baris tidak memiliki kode item.`;
+
+        }
+
+
+        if (
+            duplicateRows.length > 0
+        ) {
+
+            resultMessage +=
+                `\n${
+                    duplicateRows.length
+                } baris duplicate dilewati.`;
+
+        }
+
+
+        console.log(
+            "================================"
+        );
+
+        console.log(
+            "UPLOAD FINISHED"
+        );
+
+        console.log(
+            "Total uploaded:",
+            uploadedCount
+        );
+
+        console.log(
+            "Invalid rows:",
+            invalidRows.length
+        );
+
+        console.log(
+            "Duplicate rows:",
+            duplicateRows.length
+        );
+
+        console.log(
+            "================================"
+        );
+
+
+        setStatus(
+            `${uploadedCount.toLocaleString()} item berhasil di-upload ke Firestore.`,
             "success"
         );
 
+
         alert(
-            `${items.length.toLocaleString()} item berhasil disimpan ke Firestore.${invalidMessage}`
+            resultMessage
         );
 
 
-        excelFile.value =
-            "";
+        // Reset file picker
+
+        excelFile.value = "";
+
 
     }
 
     catch (error) {
 
-        console.error(error);
+        console.error(
+            "================================"
+        );
+
+        console.error(
+            "EXCEL UPLOAD ERROR"
+        );
+
+        console.error(
+            error
+        );
+
+        console.error(
+            "================================"
+        );
 
 
         setStatus(
-            `Upload gagal: ${error.message}`,
+            `Upload gagal: ${
+                error.message
+            }`,
             "error"
         );
 
 
         alert(
-            `Upload Excel gagal:
+            `UPLOAD EXCEL GAGAL
+
 ${error.message}`
         );
 
@@ -1293,10 +1575,18 @@ ${error.message}`
 }
 
 
-uploadExcelButton?.addEventListener(
-    "click",
-    uploadExcelToFirestore
-);
+// ========================================================
+// BUTTON
+// ========================================================
+
+if (uploadExcelButton) {
+
+    uploadExcelButton.addEventListener(
+        "click",
+        uploadExcelToFirestore
+    );
+
+}
 
 
 // ========================================================
