@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Application Gallery Item</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="imageModal">
+        <span id="closeZoom">&times;</span>
+        <img id="zoomImg" alt="Zoom Item">
+    </div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <img src="https://www.jeffan.com/secure/extensions/Intente/Jeffan_21_1_0/21.1.0/img/jeffan-logo.png"
+                class="sidebar-logo" alt="Logo Sidebar">
+
+            <h1>ERP Application System</h1>
+            <h2>Update.Ver.04.X.2026</h2>
+
+            <div id="clock-container">
+                <div id="clock-time">00:00:00</div>
+                <div id="clock-date">-</div>
+            </div>
+
+            <div class="container">
+                <h2>🗂️ Gallery Item Jeffan</h2>
+
+                <select id="vendorSelector"></select>
+                <select id="kategoriSelector"></select>
+                <select id="kodeSelector"></select>
+
+                <label for="KodeSearch">Search Item by Code:</label>
+                <input type="text" id="KodeSearch" placeholder="Sample: AB-309804-WH">
+
+                <div class="navigation-buttons">
+                    <button id="previousButton">← Previous</button>
+                    <button id="nextButton">Next →</button>
+                </div>
+
+                <button onclick="backToPurchaseOrder()">🔙 Go to Purchase Order</button>
+                <button onclick="backToApp1()">🔙 Back to Dashboard</button>
+
+                <div class="data-management">
+                    <h3>📥 Item Data Management</h3>
+                    <p class="small-text">Upload Excel untuk menambah / memperbarui item di Firestore.</p>
+
+                    <input type="file" id="excelFile" accept=".xlsx,.xls,.csv">
+                    <button id="uploadExcelButton">📤 Upload Excel ke Firestore</button>
+                    <button id="deleteItemButton" class="delete-main-button" disabled>🗑️ Hapus Item Terpilih</button>
+
+                    <div id="dataStatus" class="data-status info">Connecting...</div>
+                </div>
+
+                <div class="excel-format">
+                    <strong>Format kolom Excel:</strong>
+                    <div>kode, vendor, nama, kategori, subkategori, warna, tier, cbm, hts, gambar, keterangan</div>
+                </div>
+
+                <div class="toko-online" id="dashboardLinks">
+                    <h4>Visit Our Online Store</h4>
+                    <div class="link-toko">
+                        <a href="https://www.jeffan.com/" target="_blank">🌐 Jeffan Store</a>
+                        <a href="https://www.wayfair.com" target="_blank">🌐 Wayfair</a>
+                        <a href="https://s.id/atrisna" target="_blank">👨‍💼 Administrator</a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <div id="itemDetail" style="display:none;"></div>
+    </div>
+
+    <!-- Firebase compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+    <!-- SheetJS untuk membaca Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+    <script src="script.js"></script>
+</body>
+</html>
